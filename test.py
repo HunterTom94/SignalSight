@@ -55,7 +55,7 @@ class CanvasWrapper:
         self.grid = self.canvas.central_widget.add_grid()
 
         self.view_top = self.grid.add_view(0, 0, bgcolor='cyan')
-        image_data = _generate_random_image_data(IMAGE_SHAPE)
+        image_data = _generate_zero_image_data(IMAGE_SHAPE)
         self.image = visuals.Image(
             image_data,
             texture_format="auto",
@@ -66,7 +66,7 @@ class CanvasWrapper:
         self.view_top.camera.set_range(x=(0, IMAGE_SHAPE[1]), y=(0, IMAGE_SHAPE[0]), margin=0)
 
         self.view_bot = self.grid.add_view(1, 0, bgcolor='#c0c0c0')
-        line_data = _generate_random_line_positions(NUM_LINE_POINTS)
+        line_data = _generate_zero_line_positions(NUM_LINE_POINTS)
         self.line = visuals.Line(line_data, parent=self.view_bot.scene, color=LINE_COLOR_CHOICES[0])
         self.view_bot.camera = "panzoom"
         self.view_bot.camera.set_range(x=(0, NUM_LINE_POINTS), y=(0, 1))
@@ -81,7 +81,7 @@ class CanvasWrapper:
 
     def update_data(self, new_data_dict):
         print("Updating data...")
-        self.image.set_data(new_data_dict["image"])
+        # self.image.set_data(new_data_dict["image"])
         self.line.set_data(new_data_dict["line"])
 
 
@@ -96,6 +96,18 @@ def _generate_random_line_positions(num_points, dtype=np.float32):
     pos = np.empty((num_points, 2), dtype=np.float32)
     pos[:, 0] = np.arange(num_points)
     pos[:, 1] = rng.random((num_points,), dtype=dtype)
+    return pos
+
+def _generate_zero_image_data(shape, dtype=np.float32):
+    # Create an array of zeros with the specified shape and data type
+    data = np.zeros(shape, dtype=dtype)
+    return data
+
+def _generate_zero_line_positions(num_points, dtype=np.float32):
+    # Create an array with x-coordinates as a range and y-coordinates as zeros
+    pos = np.empty((num_points, 2), dtype=dtype)
+    pos[:, 0] = np.arange(num_points)
+    pos[:, 1] = np.zeros(num_points, dtype=dtype)  # Y-coordinates are zeros
     return pos
 
 
@@ -132,8 +144,9 @@ class DataSource(QtCore.QObject):
     new_data = QtCore.pyqtSignal(dict)
     finished = QtCore.pyqtSignal()
 
-    def __init__(self, port="COM3", baudrate=9600, parent=None):
+    def __init__(self, port="COM3", baudrate=9600, delim='\n', parent=None):
         super().__init__(parent)
+        self.delim = delim
         try:
             self.serial_port = serial.Serial(port, baudrate, timeout=1)
         except serial.SerialException as e:
@@ -142,6 +155,7 @@ class DataSource(QtCore.QObject):
             self._should_end = True
         else:
             self._should_end = False
+        self.data_buffer = np.zeros(NUM_LINE_POINTS)  # Initialize a buffer
 
     def run_data_creation(self):
         if self._should_end or (self.serial_port and not self.serial_port.isOpen()):
@@ -152,13 +166,29 @@ class DataSource(QtCore.QObject):
         try:
             if self.serial_port and self.serial_port.inWaiting() > 0:
                 line = self.serial_port.readline().decode('utf-8').strip()
-                values = [float(val) for val in line.split(',')]  # Adjust as needed
-                # Process and emit new data here
-                # ...
+                value = float(line.split(self.delim)[0])  # Parse the value
+                self._update_buffer(value)  # Update the buffer with new value
+                # Prepare data for visualization
+                data_dict = {
+                    "line": self._prepare_line_data(),
+                    # Add other data as needed
+                }
+                self.new_data.emit(data_dict)
         except Exception as e:
             print(f"Error reading from serial port: {e}")
 
         QtCore.QTimer.singleShot(0, self.run_data_creation)
+
+    def _update_buffer(self, new_value):
+        # Roll the buffer and append the new value
+        self.data_buffer = np.roll(self.data_buffer, -1)
+        self.data_buffer[-1] = new_value
+
+    def _prepare_line_data(self):
+        # Prepare line data for visualization
+        x = np.arange(NUM_LINE_POINTS)
+        y = self.data_buffer
+        return np.column_stack((x, y))
 
     def stop_data(self):
         self._should_end = True
