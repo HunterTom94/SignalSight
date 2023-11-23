@@ -21,6 +21,14 @@ class Controls(QtWidgets.QWidget):
         self.update_com_ports()  # Method to populate COM port options
         layout.addWidget(self.com_port_chooser)
 
+        # Grid toggle checkbox
+        self.grid_toggle = QtWidgets.QCheckBox("Show Grid")
+        self.grid_toggle.setChecked(True)  # Default to showing the grid
+        layout.addWidget(self.grid_toggle)
+
+        self.start_button = QtWidgets.QPushButton("Start Recording")
+        layout.addWidget(self.start_button)
+
         layout.addStretch(1)
         self.setLayout(layout)
 

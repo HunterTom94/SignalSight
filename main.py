@@ -11,24 +11,34 @@ class MyMainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, canvas_wrapper: CanvasWrapper, data_source: DataSource, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._controls = Controls()
         self.data_source = data_source
+        self._controls.start_button.clicked.connect(self.start_recording)
 
         central_widget = QtWidgets.QWidget()
         main_layout = QtWidgets.QHBoxLayout()
 
-        self._controls = Controls()
+
         main_layout.addWidget(self._controls)
-        self._canvas_wrapper = canvas_wrapper
-        main_layout.addWidget(self._canvas_wrapper.canvas.native)
+        self.canvas_wrapper = canvas_wrapper
+        main_layout.addWidget(self.canvas_wrapper.canvas.native)
+        self._controls.grid_toggle.stateChanged.connect(self.toggle_grid)
 
         central_widget.setLayout(main_layout)
         self.setCentralWidget(central_widget)
 
         self._connect_controls()
 
+    def toggle_grid(self, state):
+        # state is an integer (0 for unchecked, 2 for checked)
+        self.canvas_wrapper.toggle_grid(state == 2)
+
     def _connect_controls(self):
-        # self._controls.line_color_chooser.currentTextChanged.connect(self._canvas_wrapper.set_line_color)
+        # self._controls.line_color_chooser.currentTextChanged.connect(self.canvas_wrapper.set_line_color)
         self._controls.com_port_chooser.currentTextChanged.connect(self.update_data_source_com_port)
+
+    def start_recording(self):
+        self.data_source.start_recording()
 
     def closeEvent(self, event):
         print("Closing main window!")
@@ -65,6 +75,7 @@ if __name__ == "__main__":
     data_thread.finished.connect(data_source.deleteLater)
 
     win.show()
+    win.canvas_wrapper.view.camera.view_changed()  # Manually update the axis display range
     data_thread.start()
     app.run()
 

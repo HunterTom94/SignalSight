@@ -18,6 +18,11 @@ class DataSource(QtCore.QObject):
         else:
             self._should_end = False
         self.data_buffer = np.zeros(NUM_LINE_POINTS)  # Initialize a buffer
+        self.full_data_buffer = []  # Initialize the comprehensive data buffer
+        self.recording = False
+
+    def start_recording(self):
+        self.recording = True
 
     def run_data_creation(self):
         if self._should_end or (self.serial_port and not self.serial_port.isOpen()):
@@ -30,6 +35,9 @@ class DataSource(QtCore.QObject):
                 line = self.serial_port.readline().decode('utf-8').strip()
                 value = float(line.split(self.delim)[0])  # Parse the value
                 self._update_buffer(value)  # Update the buffer with new value
+                if self.recording:
+                    self.full_data_buffer.append(value)  # Store the value in the full buffer
+
                 # Prepare data for visualization
                 data_dict = {
                     "line": self._prepare_line_data(),
