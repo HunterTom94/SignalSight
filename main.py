@@ -22,8 +22,13 @@ class MyMainWindow(QtWidgets.QMainWindow):
         central_widget = QtWidgets.QWidget()
         main_layout = QtWidgets.QHBoxLayout()
 
-        main_layout.addWidget(self._controls)
         self._canvas_wrapper = canvas_wrapper
+
+        self._controls.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
+        self._canvas_wrapper.canvas.native.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                                         QtWidgets.QSizePolicy.Expanding)
+
+        main_layout.addWidget(self._controls)
         main_layout.addWidget(self._canvas_wrapper.canvas.native)
         self._controls.grid_toggle.stateChanged.connect(self.toggle_grid)
 
@@ -33,6 +38,18 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self._connect_controls()
 
         self._controls.display_duration_changed.connect(self.on_display_duration_changed)
+
+        self._controls.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
+        self._canvas_wrapper.canvas.native.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                                         QtWidgets.QSizePolicy.Expanding)
+        self.resizeEvent = self.onResize
+
+    def onResize(self, event):
+        # Calculate new font size based on window size
+        new_font_size = int(self.width() * 0.01)
+        self._controls.update_font_size(new_font_size)
+
+        super().resizeEvent(event)
 
     def toggle_grid(self, state):
         # state is an integer (0 for unchecked, 2 for checked)

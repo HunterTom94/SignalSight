@@ -12,7 +12,7 @@ class DataSource(QtCore.QObject):
     def __init__(self, port="COM3", baudrate=9600, delim='\n', parent=None):
         super().__init__(parent)
         self.delim = delim
-        self.current_display_range = NUM_LINE_POINTS
+        self.current_display_range = 100
         self.data_rate = -1
         try:
             self.serial_port = serial.Serial(port, baudrate, timeout=1)
@@ -74,9 +74,6 @@ class DataSource(QtCore.QObject):
             else:
                 avg_data_rate = 1 / self.data_rate  # Fallback to the current data rate
 
-            # print(f"Valid timestamps:\n{valid_timestamps}")
-            # print(f"Valid values:\n{valid_data[:, 1]}")
-
             # Infer timestamps for initial data points
             num_inferred_timestamps = n - len(valid_timestamps)
             inferred_timestamps = valid_timestamps[0] - np.arange(1, num_inferred_timestamps + 1)[::-1] * avg_data_rate
@@ -92,10 +89,6 @@ class DataSource(QtCore.QObject):
         # Calculate x values based on timestamps
         x = (combined_timestamps - combined_timestamps[-1]) / self.data_rate
         y = combined_values
-
-        print(f'index: {self.buffer_index}')
-        print(f'x: {x}')
-        print(f'y: {y}')
 
         return np.column_stack((x, y))
 
@@ -113,8 +106,6 @@ class DataSource(QtCore.QObject):
         current_timestamp = time.time()
 
         self.data_buffer[self.buffer_index] = [current_timestamp, new_value]
-        # print(f"Buffer index: {self.buffer_index}")
-        # print(f"Buffer state:\n{self.data_buffer}")
         self.buffer_index = (self.buffer_index + 1) % self.data_buffer.size
 
         # Calculate time difference

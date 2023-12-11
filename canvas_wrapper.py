@@ -15,14 +15,14 @@ class CanvasWrapper:
         self.view.camera = 'panzoom'
 
         # Create the line plot
-        line_data = self._generate_zero_line_positions(NUM_LINE_POINTS)
+        line_data = self._generate_zero_line_positions(100)
         self.line = visuals.Line(line_data, color=LINE_COLOR_CHOICES[0])
         self.view.add(self.line)
 
         self.lower_left_padding = Widget(bgcolor=self.view.bgcolor)
         self.grid.add_widget(self.lower_left_padding, row=1, col=0)
 
-        self.xaxis = AxisWidget(orientation='bottom', axis_color='black', text_color='black', tick_color='black')
+        self.xaxis = AxisWidget(orientation='bottom', axis_color='black', text_color='black', tick_color='black', axis_label="Time (seconds)")
         self.xaxis.bgcolor = self.view.bgcolor
         self.xaxis.stretch = (1, 0.1)
         self.grid.add_widget(self.xaxis, row=1, col=1)
@@ -37,8 +37,8 @@ class CanvasWrapper:
         self.yaxis.link_view(self.view)
 
         # Update view and axes ranges
-        self.view.camera.set_range(x=(0, NUM_LINE_POINTS), y=(0, 1))
-        self.xaxis.axis.domain = (0, NUM_LINE_POINTS)
+        self.view.camera.set_range(x=(-100, 0), y=(0, 1))
+        self.xaxis.axis.domain = (-100, 0)
         self.yaxis.axis.domain = (0, 1)
 
         # Create grid lines

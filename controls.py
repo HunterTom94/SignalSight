@@ -35,7 +35,8 @@ class Controls(QtWidgets.QWidget):
         layout.addWidget(self.data_rate_display)
 
         # Display Range Input
-        layout.addWidget(QtWidgets.QLabel("Display Range (s):"))
+        self.display_range_label = QtWidgets.QLabel("Display Range (s):")
+        layout.addWidget(self.display_range_label)
         self.display_range_input = QtWidgets.QLineEdit("10")  # Default value set to 10
         self.display_range_input.setValidator(QtGui.QDoubleValidator(0.0, 10000.0, 2))
         self.display_range_input.textChanged.connect(self.on_display_range_input_changed)
@@ -43,6 +44,21 @@ class Controls(QtWidgets.QWidget):
 
         layout.addStretch(1)
         self.setLayout(layout)
+
+    def update_font_size(self, size):
+        font = QtGui.QFont()
+        font.setPointSize(size)
+
+        # Update font for labels, buttons, and other widgets
+        self.com_port_label.setFont(font)
+        self.grid_toggle.setFont(font)
+        self.start_button.setFont(font)
+        self.data_rate_display.setFont(font)
+        self.display_range_label.setFont(font)
+
+        # Update font for ComboBox and LineEdit
+        self.com_port_chooser.setFont(font)
+        self.display_range_input.setFont(font)
 
     def on_display_range_input_changed(self):
         try:
