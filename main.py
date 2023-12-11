@@ -13,9 +13,8 @@ class MyMainWindow(QtWidgets.QMainWindow):
         super().__init__(*args, **kwargs)
         self._controls = Controls()
         self.data_source = data_source
-        initial_display_range = int(self._controls.display_range_input.text())
-        self.data_source.current_display_range = initial_display_range
         self.data_source.data_rate_calculated.connect(self.update_data_rate_input)
+
 
         self._controls.start_button.clicked.connect(self.start_recording)
 
@@ -27,6 +26,8 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self._controls.setSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
         self._canvas_wrapper.canvas.native.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
                                                          QtWidgets.QSizePolicy.Expanding)
+
+        self.data_source.new_yrange.connect(self._canvas_wrapper.update_y_axis_range)
 
         main_layout.addWidget(self._controls)
         main_layout.addWidget(self._canvas_wrapper.canvas.native)
@@ -74,7 +75,6 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self._canvas_wrapper.view.camera.view_changed()
 
     def update_data_rate_input(self, data_rate):
-        print(f"Data rate changed to {data_rate} Hz")
         self.update_display_range(data_rate)
         self._controls.update_data_rate_display(data_rate)
 
@@ -87,8 +87,8 @@ class MyMainWindow(QtWidgets.QMainWindow):
         # Use the latest data rate and display duration to calculate the new range
         duration = self._controls.display_range_input.text()
         new_range = data_rate * float(duration)
-        self.data_source.current_display_range = int(new_range)
-        self._canvas_wrapper.update_x_axis_range(new_range)
+        # self.data_source.current_display_range = int(new_range)
+        self._canvas_wrapper.update_x_axis_range(new_range/self.data_source.data_rate)
 
 
 if __name__ == "__main__":

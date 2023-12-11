@@ -37,9 +37,9 @@ class CanvasWrapper:
         self.yaxis.link_view(self.view)
 
         # Update view and axes ranges
-        self.view.camera.set_range(x=(-100, 0), y=(0, 1))
-        self.xaxis.axis.domain = (-100, 0)
-        self.yaxis.axis.domain = (0, 1)
+        self.xrange = (-100, 0)
+        self.yrange = (0, 1)
+        self.update_axis_range()
 
         # Create grid lines
         self.grid_lines = GridLines(parent=self.view.scene)
@@ -56,8 +56,17 @@ class CanvasWrapper:
 
     def update_x_axis_range(self, new_range):
         # Update x-axis domain and view camera range
-        self.xaxis.axis.domain = (-new_range, 0)
-        self.view.camera.set_range(x=(-new_range, 0))
+        self.xrange = (-new_range, 0)
+        self.update_axis_range()
+
+    def update_y_axis_range(self, new_range):
+        self.yrange = new_range
+        self.update_axis_range()
+
+    def update_axis_range(self):
+        self.xaxis.axis.domain = self.xrange
+        self.yaxis.axis.domain = self.yrange
+        self.view.camera.set_range(x=self.xrange, y=self.yrange)
 
     @staticmethod
     def _generate_zero_line_positions(num_points, dtype=np.float32):

@@ -1,3 +1,4 @@
+import struct
 import time
 
 import numpy as np
@@ -8,11 +9,13 @@ class DataSource(QtCore.QObject):
     new_data = QtCore.pyqtSignal(dict)
     finished = QtCore.pyqtSignal()
     data_rate_calculated = QtCore.pyqtSignal(float)  # Signal to emit the calculated data rate
+    new_yrange = QtCore.pyqtSignal(list)
 
-    def __init__(self, port="COM3", baudrate=9600, delim='\n', parent=None):
+    def __init__(self, port="COM6", baudrate=921600, delim='\n', parent=None):
         super().__init__(parent)
+
         self.delim = delim
-        self.current_display_range = 100
+        self.current_display_range = int(10e3)
         self.data_rate = -1
         try:
             self.serial_port = serial.Serial(port, baudrate, timeout=1)
@@ -24,11 +27,15 @@ class DataSource(QtCore.QObject):
             self._should_end = False
         self.data_buffer = np.zeros((NUM_LINE_POINTS, 2))
         self.buffer_index = 0
+        self.yrange = [0, 1]
+
         self.recording = False
         self.last_update_time = None
 
         self.recording_buffer = []
 
+        self.starting_time = time.time()
+        self.last_time_data_rate_emit = time.time()
 
     def start_recording(self):
         self.recording = True
@@ -40,12 +47,26 @@ class DataSource(QtCore.QObject):
             return
 
         try:
-            if self.serial_port and self.serial_port.inWaiting() > 0:
+            if self.serial_port and self.serial_port.inWaiting() >= 4:
+                # Read 4 bytes (size of a float in C/C++)
+                # binary_data = self.serial_port.read(4)
+
+                # Unpack the binary data into a float
+                # value = struct.unpack('f', binary_data)[0]
+
+                # # Read 2 bytes (size of a 16-bit integer in C/C++)
+                # binary_data = self.serial_port.read(2)
+                #
+                # # Unpack the binary data into a 16-bit integer
+                # value = struct.unpack('h', binary_data)[0]  # 'h' format is for short (2 bytes)
+
                 line = self.serial_port.readline().decode('utf-8').strip()
                 value = float(line.split(self.delim)[0])  # Parse the value
-                self._update_buffer(value)  # Update the buffer with new value
+
+                self._update_buffer(value)
+
                 if self.recording:
-                    self.recording_buffer.append(value)  # Store the value in the full buffer
+                    self.recording_buffer.append(value)
 
                 # Prepare data for visualization
                 data_dict = {
@@ -65,6 +86,7 @@ class DataSource(QtCore.QObject):
         if self.buffer_index < n:
             # Get the part of the buffer that has valid data
             valid_data = self.data_buffer[:self.buffer_index]
+            # print(f'valid data: {valid_data}')
 
             # Calculate average data rate for valid data
             valid_timestamps = valid_data[:, 0]
@@ -87,8 +109,12 @@ class DataSource(QtCore.QObject):
             combined_values = self.data_buffer[self.buffer_index - n:self.buffer_index, 1]
 
         # Calculate x values based on timestamps
-        x = (combined_timestamps - combined_timestamps[-1]) / self.data_rate
+        x = (combined_timestamps - combined_timestamps[-1])
         y = combined_values
+
+        # print(f'data rate: {self.data_rate}')
+        # print(f'x: {x}')
+        # print(f'y: {y}')
 
         return np.column_stack((x, y))
 
@@ -100,26 +126,31 @@ class DataSource(QtCore.QObject):
     def _update_buffer(self, new_value):
         def _is_significant_change(old_rate, new_rate):
             # Define a dynamic threshold as a percentage of the old rate
-            threshold = abs(old_rate * 0.01)  # 1% of the old rate as threshold
+            threshold = abs(old_rate * 0.1)  # 1% of the old rate as threshold
             return abs(new_rate - old_rate) > threshold
 
-        current_timestamp = time.time()
+        current_timestamp = time.time() - self.starting_time
 
         self.data_buffer[self.buffer_index] = [current_timestamp, new_value]
         self.buffer_index = (self.buffer_index + 1) % self.data_buffer.size
 
+        if new_value < self.yrange[0]:
+            self.yrange[0] = new_value
+            self.new_yrange.emit(self.yrange)
+        elif new_value > self.yrange[1]:
+            self.yrange[1] = new_value
+            self.new_yrange.emit(self.yrange)
+
         # Calculate time difference
         current_time = time.time()
-        if self.last_update_time:
-            time_diff = current_time - self.last_update_time
-            # Update the data rate based on the average time difference
-            if time_diff > 0:
-                calculated_data_rate = 1 / time_diff
-                # Round data rate to 3 significant figures
-                # Update only if there is a significant change
-                if _is_significant_change(self.data_rate, calculated_data_rate):
-                    self.data_rate = calculated_data_rate
-                    self.data_rate_calculated.emit(self.data_rate)
+        if self.last_update_time and current_time - self.last_time_data_rate_emit > 1:
+            calculated_data_rate = 1 / np.mean(np.diff(self.data_buffer[:self.buffer_index, 0]))
+            # Round data rate to 3 significant figures
+            # Update only if there is a significant change
+            if _is_significant_change(self.data_rate, calculated_data_rate):
+                self.data_rate = calculated_data_rate
+                self.data_rate_calculated.emit(self.data_rate)
+                self.last_time_data_rate_emit = current_time
 
         self.last_update_time = current_time
 
