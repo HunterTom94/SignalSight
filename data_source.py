@@ -13,7 +13,7 @@ class DataSource(QtCore.QObject):
         super().__init__(parent)
         self.delim = delim
         self.current_display_range = NUM_LINE_POINTS
-        self.data_rate = 1
+        self.data_rate = -1
         try:
             self.serial_port = serial.Serial(port, baudrate, timeout=1)
         except serial.SerialException as e:
@@ -68,6 +68,8 @@ class DataSource(QtCore.QObject):
             y = self.data_buffer[self.buffer_index - n:self.buffer_index]
 
         x = (np.arange(-n, 0) + 1) / self.data_rate
+        # print(f"X: {x}")
+        # print(f"Y: {y}")
         return np.column_stack((x, y))
 
     def update_com_port(self, com_port):
@@ -76,6 +78,11 @@ class DataSource(QtCore.QObject):
         self.serial_port = serial.Serial(com_port, self.baudrate, timeout=1)
 
     def _update_buffer(self, new_value):
+        def _is_significant_change(old_rate, new_rate):
+            # Define a dynamic threshold as a percentage of the old rate
+            threshold = abs(old_rate * 0.01)  # 1% of the old rate as threshold
+            return abs(new_rate - old_rate) > threshold
+
         # Update the buffer at the current index
         self.data_buffer[self.buffer_index] = new_value
         # Increment the index using modulo for circular behavior
@@ -87,8 +94,13 @@ class DataSource(QtCore.QObject):
             time_diff = current_time - self.last_update_time
             # Update the data rate based on the average time difference
             if time_diff > 0:
-                self.data_rate = 1 / time_diff
-                self.data_rate_calculated.emit(self.data_rate)
+                calculated_data_rate = 1 / time_diff
+                # Round data rate to 3 significant figures
+                # Update only if there is a significant change
+                if _is_significant_change(self.data_rate, calculated_data_rate):
+                    self.data_rate = calculated_data_rate
+                    self.data_rate_calculated.emit(self.data_rate)
+
         self.last_update_time = current_time
 
     def adjust_buffer_size(self, max_data_rate, display_duration):

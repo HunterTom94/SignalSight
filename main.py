@@ -32,7 +32,6 @@ class MyMainWindow(QtWidgets.QMainWindow):
 
         self._connect_controls()
 
-        self._controls.data_rate_changed.connect(self.on_data_rate_changed)
         self._controls.display_duration_changed.connect(self.on_display_duration_changed)
 
     def toggle_grid(self, state):
@@ -58,20 +57,17 @@ class MyMainWindow(QtWidgets.QMainWindow):
         self._canvas_wrapper.view.camera.view_changed()
 
     def update_data_rate_input(self, data_rate):
-        if self._controls.auto_detect_checkbox.isChecked():
-            self._controls.data_rate_input.setText(str(round(data_rate, 2)))
+        print(f"Data rate changed to {data_rate} Hz")
+        self.update_display_range(data_rate)
+        self._controls.update_data_rate_display(data_rate)
 
-    def on_data_rate_changed(self, data_rate):
-        # Handle data rate change
-        self.update_display_range()
 
     def on_display_duration_changed(self, duration):
         print(f"Display duration changed to {duration} seconds")
-        self.update_display_range()
+        self.update_display_range(self.data_source.data_rate)
 
-    def update_display_range(self):
+    def update_display_range(self, data_rate):
         # Use the latest data rate and display duration to calculate the new range
-        data_rate = float(self._controls.data_rate_input.text())
         duration = int(self._controls.display_range_selector.currentText())
         new_range = data_rate * duration
         self.data_source.current_display_range = int(new_range)

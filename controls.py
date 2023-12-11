@@ -5,7 +5,6 @@ from serial.tools import list_ports
 from constants import COLORMAP_CHOICES, LINE_COLOR_CHOICES
 
 class Controls(QtWidgets.QWidget):
-    data_rate_changed = QtCore.pyqtSignal(float)
     display_duration_changed = QtCore.pyqtSignal(int)
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -31,30 +30,19 @@ class Controls(QtWidgets.QWidget):
         self.start_button = QtWidgets.QPushButton("Start Recording")
         layout.addWidget(self.start_button)
 
-        # Data Rate Input Box
-        self.data_rate_input = QtWidgets.QLineEdit()
-        self.data_rate_input.setValidator(QtGui.QDoubleValidator(0.0, 10000.0, 2))
-        self.data_rate_input.setEnabled(False)
-        self.data_rate_input.textChanged.connect(self.on_data_rate_input_changed)
-
-        # Auto Detect Data Rate Checkbox
-        self.auto_detect_checkbox = QtWidgets.QCheckBox("Auto Detect Data Rate")
-        self.auto_detect_checkbox.stateChanged.connect(self.toggle_data_rate_input)
-        self.auto_detect_checkbox.setChecked(True)  # Checked by default
-
-        layout.addWidget(self.auto_detect_checkbox)
-        layout.addWidget(QtWidgets.QLabel("Data Rate:"))
-
-        # Hz label
-        data_rate_layout = QtWidgets.QHBoxLayout()
-        data_rate_layout.addWidget(self.data_rate_input)
-        data_rate_layout.addWidget(QtWidgets.QLabel("Hz"))
-        layout.addLayout(data_rate_layout)
+        # Data Rate Display
+        self.data_rate_display = QtWidgets.QLabel("Data Rate: -- Hz")
+        layout.addWidget(self.data_rate_display)
 
         # Add QComboBox for display range
         self.display_range_selector = QtWidgets.QComboBox()
         self.display_range_selector.addItems(
             ["1", "2", "5", "10", "20", "50", "100"])
+        # Set "10" as the default value
+        default_range_index = self.display_range_selector.findText("10")
+        if default_range_index >= 0:  # Check if "10" was found
+            self.display_range_selector.setCurrentIndex(default_range_index)
+
         self.display_range_selector.currentTextChanged.connect(self.on_display_range_selection_changed)
         layout.addWidget(QtWidgets.QLabel("Display Range (s):"))
         layout.addWidget(self.display_range_selector)
@@ -62,20 +50,9 @@ class Controls(QtWidgets.QWidget):
         layout.addStretch(1)
         self.setLayout(layout)
 
-    def on_data_rate_input_changed(self):
-        try:
-            data_rate = float(self.data_rate_input.text())
-            self.data_rate_changed.emit(data_rate)
-        except ValueError:
-            pass
-
     def on_display_range_selection_changed(self):
         duration = int(self.display_range_selector.currentText())
         self.display_duration_changed.emit(duration)
-
-    def toggle_data_rate_input(self):
-        # Enable/Disable data rate input based on checkbox
-        self.data_rate_input.setEnabled(not self.auto_detect_checkbox.isChecked())
 
     def update_com_ports(self):
         # Method to populate the dropdown with available COM ports
@@ -83,3 +60,19 @@ class Controls(QtWidgets.QWidget):
         com_ports = list_ports.comports()
         for port in com_ports:
             self.com_port_chooser.addItem(port.device)
+
+    def update_data_rate_display(self, data_rate):
+        if data_rate < 1e3:  # Less than 1 kHz
+            display_rate = data_rate
+            unit = "Hz"
+            text = f"Data Rate: {display_rate:.1f} {unit}"
+        elif data_rate < 1e6:  # 1 kHz to 1 MHz
+            display_rate = data_rate / 1e3  # Convert to kHz
+            unit = "kHz"
+            text = f"Data Rate: {display_rate:.1f} {unit}"
+        else:  # 1 MHz or higher
+            display_rate = data_rate / 1e6  # Convert to MHz
+            unit = "MHz"
+            text = f"Data Rate: {display_rate:.1f} {unit}"  # No decimal places
+
+        self.data_rate_display.setText(text)
