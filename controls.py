@@ -34,25 +34,22 @@ class Controls(QtWidgets.QWidget):
         self.data_rate_display = QtWidgets.QLabel("Data Rate: -- Hz")
         layout.addWidget(self.data_rate_display)
 
-        # Add QComboBox for display range
-        self.display_range_selector = QtWidgets.QComboBox()
-        self.display_range_selector.addItems(
-            ["1", "2", "5", "10", "20", "50", "100"])
-        # Set "10" as the default value
-        default_range_index = self.display_range_selector.findText("10")
-        if default_range_index >= 0:  # Check if "10" was found
-            self.display_range_selector.setCurrentIndex(default_range_index)
-
-        self.display_range_selector.currentTextChanged.connect(self.on_display_range_selection_changed)
+        # Display Range Input
         layout.addWidget(QtWidgets.QLabel("Display Range (s):"))
-        layout.addWidget(self.display_range_selector)
+        self.display_range_input = QtWidgets.QLineEdit("10")  # Default value set to 10
+        self.display_range_input.setValidator(QtGui.QDoubleValidator(0.0, 10000.0, 2))
+        self.display_range_input.textChanged.connect(self.on_display_range_input_changed)
+        layout.addWidget(self.display_range_input)
 
         layout.addStretch(1)
         self.setLayout(layout)
 
-    def on_display_range_selection_changed(self):
-        duration = int(self.display_range_selector.currentText())
-        self.display_duration_changed.emit(duration)
+    def on_display_range_input_changed(self):
+        try:
+            duration = float(self.display_range_input.text())
+            self.display_duration_changed.emit(duration)
+        except ValueError:
+            pass  # Handle invalid input here if needed
 
     def update_com_ports(self):
         # Method to populate the dropdown with available COM ports

@@ -13,7 +13,7 @@ class MyMainWindow(QtWidgets.QMainWindow):
         super().__init__(*args, **kwargs)
         self._controls = Controls()
         self.data_source = data_source
-        initial_display_range = int(self._controls.display_range_selector.currentText())
+        initial_display_range = int(self._controls.display_range_input.text())
         self.data_source.current_display_range = initial_display_range
         self.data_source.data_rate_calculated.connect(self.update_data_rate_input)
 
@@ -68,8 +68,8 @@ class MyMainWindow(QtWidgets.QMainWindow):
 
     def update_display_range(self, data_rate):
         # Use the latest data rate and display duration to calculate the new range
-        duration = int(self._controls.display_range_selector.currentText())
-        new_range = data_rate * duration
+        duration = self._controls.display_range_input.text()
+        new_range = data_rate * float(duration)
         self.data_source.current_display_range = int(new_range)
         self._canvas_wrapper.update_x_axis_range(new_range)
 

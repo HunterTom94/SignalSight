@@ -22,7 +22,7 @@ class DataSource(QtCore.QObject):
             self._should_end = True
         else:
             self._should_end = False
-        self.data_buffer = np.zeros(NUM_LINE_POINTS)
+        self.data_buffer = np.zeros((NUM_LINE_POINTS, 2))
         self.buffer_index = 0
         self.recording = False
         self.last_update_time = None
@@ -60,16 +60,43 @@ class DataSource(QtCore.QObject):
 
     def _prepare_line_data(self):
         n = self.current_display_range + 1
-        assert n < self.data_buffer.size
-        if self.buffer_index < n:
-            # If current index is less than n, circle back to the end of the buffer
-            y = np.concatenate((self.data_buffer[self.buffer_index - n:], self.data_buffer[:self.buffer_index]))
-        else:
-            y = self.data_buffer[self.buffer_index - n:self.buffer_index]
+        assert n <= self.data_buffer.shape[0]
 
-        x = (np.arange(-n, 0) + 1) / self.data_rate
-        # print(f"X: {x}")
-        # print(f"Y: {y}")
+        if self.buffer_index < n:
+            # Get the part of the buffer that has valid data
+            valid_data = self.data_buffer[:self.buffer_index]
+
+            # Calculate average data rate for valid data
+            valid_timestamps = valid_data[:, 0]
+            valid_timestamps = valid_timestamps[valid_timestamps > 0]  # Filter out zeros
+            if len(valid_timestamps) > 1:
+                avg_data_rate = np.mean(np.diff(valid_timestamps))
+            else:
+                avg_data_rate = 1 / self.data_rate  # Fallback to the current data rate
+
+            # print(f"Valid timestamps:\n{valid_timestamps}")
+            # print(f"Valid values:\n{valid_data[:, 1]}")
+
+            # Infer timestamps for initial data points
+            num_inferred_timestamps = n - len(valid_timestamps)
+            inferred_timestamps = valid_timestamps[0] - np.arange(1, num_inferred_timestamps + 1)[::-1] * avg_data_rate
+            combined_timestamps = np.concatenate([inferred_timestamps, valid_timestamps])
+
+            # Handle values for inferred timestamps
+            values_for_inferred_timestamps = self.data_buffer[-num_inferred_timestamps:, 1]
+            combined_values = np.concatenate([values_for_inferred_timestamps, valid_data[:, 1]])
+        else:
+            combined_timestamps = self.data_buffer[self.buffer_index - n:self.buffer_index, 0]
+            combined_values = self.data_buffer[self.buffer_index - n:self.buffer_index, 1]
+
+        # Calculate x values based on timestamps
+        x = (combined_timestamps - combined_timestamps[-1]) / self.data_rate
+        y = combined_values
+
+        print(f'index: {self.buffer_index}')
+        print(f'x: {x}')
+        print(f'y: {y}')
+
         return np.column_stack((x, y))
 
     def update_com_port(self, com_port):
@@ -83,9 +110,11 @@ class DataSource(QtCore.QObject):
             threshold = abs(old_rate * 0.01)  # 1% of the old rate as threshold
             return abs(new_rate - old_rate) > threshold
 
-        # Update the buffer at the current index
-        self.data_buffer[self.buffer_index] = new_value
-        # Increment the index using modulo for circular behavior
+        current_timestamp = time.time()
+
+        self.data_buffer[self.buffer_index] = [current_timestamp, new_value]
+        # print(f"Buffer index: {self.buffer_index}")
+        # print(f"Buffer state:\n{self.data_buffer}")
         self.buffer_index = (self.buffer_index + 1) % self.data_buffer.size
 
         # Calculate time difference
