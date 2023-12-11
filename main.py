@@ -13,11 +13,14 @@ class MyMainWindow(QtWidgets.QMainWindow):
         super().__init__(*args, **kwargs)
         self._controls = Controls()
         self.data_source = data_source
+        initial_display_range = int(self._controls.display_range_selector.currentText())
+        self.data_source.current_display_range = initial_display_range
+        self.data_source.data_rate_calculated.connect(self.update_data_rate_input)
+
         self._controls.start_button.clicked.connect(self.start_recording)
 
         central_widget = QtWidgets.QWidget()
         main_layout = QtWidgets.QHBoxLayout()
-
 
         main_layout.addWidget(self._controls)
         self._canvas_wrapper = canvas_wrapper
@@ -29,12 +32,14 @@ class MyMainWindow(QtWidgets.QMainWindow):
 
         self._connect_controls()
 
+        self._controls.data_rate_changed.connect(self.on_data_rate_changed)
+        self._controls.display_duration_changed.connect(self.on_display_duration_changed)
+
     def toggle_grid(self, state):
         # state is an integer (0 for unchecked, 2 for checked)
         self._canvas_wrapper.toggle_grid(state == 2)
 
     def _connect_controls(self):
-        # self._controls.line_color_chooser.currentTextChanged.connect(self._canvas_wrapper.set_line_color)
         self._controls.com_port_chooser.currentTextChanged.connect(self.update_data_source_com_port)
 
     def start_recording(self):
@@ -52,7 +57,25 @@ class MyMainWindow(QtWidgets.QMainWindow):
     def camera_on_view_changed(self):
         self._canvas_wrapper.view.camera.view_changed()
 
+    def update_data_rate_input(self, data_rate):
+        if self._controls.auto_detect_checkbox.isChecked():
+            self._controls.data_rate_input.setText(str(round(data_rate, 2)))
 
+    def on_data_rate_changed(self, data_rate):
+        # Handle data rate change
+        self.update_display_range()
+
+    def on_display_duration_changed(self, duration):
+        print(f"Display duration changed to {duration} seconds")
+        self.update_display_range()
+
+    def update_display_range(self):
+        # Use the latest data rate and display duration to calculate the new range
+        data_rate = float(self._controls.data_rate_input.text())
+        duration = int(self._controls.display_range_selector.currentText())
+        new_range = data_rate * duration
+        self.data_source.current_display_range = int(new_range)
+        self._canvas_wrapper.update_x_axis_range(new_range)
 
 
 if __name__ == "__main__":

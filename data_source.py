@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import serial
 from PyQt5 import QtCore
@@ -5,10 +7,13 @@ from constants import NUM_LINE_POINTS
 class DataSource(QtCore.QObject):
     new_data = QtCore.pyqtSignal(dict)
     finished = QtCore.pyqtSignal()
+    data_rate_calculated = QtCore.pyqtSignal(float)  # Signal to emit the calculated data rate
 
     def __init__(self, port="COM3", baudrate=9600, delim='\n', parent=None):
         super().__init__(parent)
         self.delim = delim
+        self.current_display_range = NUM_LINE_POINTS
+        self.data_rate = 1
         try:
             self.serial_port = serial.Serial(port, baudrate, timeout=1)
         except serial.SerialException as e:
@@ -17,9 +22,13 @@ class DataSource(QtCore.QObject):
             self._should_end = True
         else:
             self._should_end = False
-        self.data_buffer = np.zeros(NUM_LINE_POINTS)  # Initialize a buffer
-        self.full_data_buffer = []  # Initialize the comprehensive data buffer
+        self.data_buffer = np.zeros(NUM_LINE_POINTS)
+        self.buffer_index = 0
         self.recording = False
+        self.last_update_time = None
+
+        self.recording_buffer = []
+
 
     def start_recording(self):
         self.recording = True
@@ -36,7 +45,7 @@ class DataSource(QtCore.QObject):
                 value = float(line.split(self.delim)[0])  # Parse the value
                 self._update_buffer(value)  # Update the buffer with new value
                 if self.recording:
-                    self.full_data_buffer.append(value)  # Store the value in the full buffer
+                    self.recording_buffer.append(value)  # Store the value in the full buffer
 
                 # Prepare data for visualization
                 data_dict = {
@@ -49,21 +58,41 @@ class DataSource(QtCore.QObject):
 
         QtCore.QTimer.singleShot(0, self.run_data_creation)
 
+    def _prepare_line_data(self):
+        n = self.current_display_range + 1
+        assert n < self.data_buffer.size
+        if self.buffer_index < n:
+            # If current index is less than n, circle back to the end of the buffer
+            y = np.concatenate((self.data_buffer[self.buffer_index - n:], self.data_buffer[:self.buffer_index]))
+        else:
+            y = self.data_buffer[self.buffer_index - n:self.buffer_index]
+
+        x = (np.arange(-n, 0) + 1) / self.data_rate
+        return np.column_stack((x, y))
+
     def update_com_port(self, com_port):
         if self.serial_port and self.serial_port.isOpen():
             self.serial_port.close()
         self.serial_port = serial.Serial(com_port, self.baudrate, timeout=1)
 
     def _update_buffer(self, new_value):
-        # Roll the buffer and append the new value
-        self.data_buffer = np.roll(self.data_buffer, -1)
-        self.data_buffer[-1] = new_value
+        # Update the buffer at the current index
+        self.data_buffer[self.buffer_index] = new_value
+        # Increment the index using modulo for circular behavior
+        self.buffer_index = (self.buffer_index + 1) % self.data_buffer.size
 
-    def _prepare_line_data(self):
-        # Prepare line data for visualization
-        x = np.arange(NUM_LINE_POINTS)
-        y = self.data_buffer
-        return np.column_stack((x, y))
+        # Calculate time difference
+        current_time = time.time()
+        if self.last_update_time:
+            time_diff = current_time - self.last_update_time
+            # Update the data rate based on the average time difference
+            if time_diff > 0:
+                self.data_rate = 1 / time_diff
+                self.data_rate_calculated.emit(self.data_rate)
+        self.last_update_time = current_time
+
+    def adjust_buffer_size(self, max_data_rate, display_duration):
+        new_buffer_size = int(max_data_rate * display_duration)
 
     def stop_data(self):
         self._should_end = True

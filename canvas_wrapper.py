@@ -54,6 +54,11 @@ class CanvasWrapper:
     def toggle_grid(self, state):
         self.grid_lines.visible = state
 
+    def update_x_axis_range(self, new_range):
+        # Update x-axis domain and view camera range
+        self.xaxis.axis.domain = (-new_range, 0)
+        self.view.camera.set_range(x=(-new_range, 0))
+
     @staticmethod
     def _generate_zero_line_positions(num_points, dtype=np.float32):
         pos = np.empty((num_points, 2), dtype=dtype)
